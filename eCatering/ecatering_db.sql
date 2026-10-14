@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 13-10-2026 a las 21:14:36
+-- Tiempo de generación: 14-10-2026 a las 21:41:41
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.2.12
 
@@ -43,7 +43,7 @@ CREATE TABLE `certificados_salud` (
 --
 
 INSERT INTO `certificados_salud` (`id_certificado`, `cedula`, `nombre_personal`, `cargo`, `cuadrilla`, `fecha_emision`, `fecha_vencimiento`, `estado_vigencia`) VALUES
-(1, '29.984.325', 'Ariadna Colmenares', 'Ayudante', 'A', '2026-10-07', '2026-11-28', 'Vigente'),
+(1, '29.984.325', 'Ariadna Colmenares', 'Ayudante', 'A', '2026-10-07', '2027-01-12', 'Vigente'),
 (2, '123456', 'José Perez', 'Cocinero', 'B', '2026-01-01', '2027-10-15', 'Vigente');
 
 -- --------------------------------------------------------
@@ -69,14 +69,14 @@ CREATE TABLE `inventario` (
 INSERT INTO `inventario` (`id_producto`, `nombre_insumo`, `categoria`, `cantidad`, `unidad_medida`, `stock_minimo`, `estado`) VALUES
 (1, 'Arroz Blanco Superior', 'Víveres', 150.00, 'Kg', 30.00, 'Disponible'),
 (2, 'Harina de Maíz Precocida', 'Víveres', 200.00, 'Kg', 50.00, 'Disponible'),
-(3, 'Aceite Vegetal 1L', 'Víveres', 30.00, 'Lts', 15.00, 'Disponible'),
-(4, 'Azúcar Refinada', 'Víveres', 40.00, 'Kg', 20.00, 'Disponible'),
+(3, 'Aceite Vegetal 1L', 'Víveres', 20.00, 'Lts', 15.00, 'Disponible'),
+(4, 'Azúcar Refinada', 'Víveres', 38.00, 'Kg', 20.00, 'Disponible'),
 (5, 'Pasta Plumas', 'Víveres', 80.00, 'Kg', 20.00, 'Disponible'),
 (6, 'Caraotas Negras', 'Víveres', 45.00, 'Kg', 10.00, 'Disponible'),
 (7, 'Pechuga de Pollo Deshuesada', 'Proteínas', 65.00, 'Kg', 15.00, 'Disponible'),
 (8, 'Carne de Res para Mechar', 'Proteínas', 30.00, 'Kg', 25.00, 'Disponible'),
 (9, 'Chuleta de Cerdo Ahumada', 'Proteínas', 30.00, 'Kg', 10.00, 'Disponible'),
-(10, 'Filet de Merluza', 'Proteínas', 30.00, 'Kg', 8.00, 'Disponible'),
+(10, 'Filet de Merluza', 'Proteínas', 20.00, 'Kg', 8.00, 'Disponible'),
 (11, 'Queso Blanco Duro', 'Lácteos', 22.00, 'Kg', 5.00, 'Disponible'),
 (12, 'Mantequilla con Sal 500g', 'Lácteos', 18.00, 'PCE', 5.00, 'Disponible'),
 (13, 'Leche Completa en Polvo', 'Lácteos', 15.00, 'Kg', 10.00, 'Disponible'),
@@ -89,6 +89,29 @@ INSERT INTO `inventario` (`id_producto`, `nombre_insumo`, `categoria`, `cantidad
 (20, 'Desengrasante Industrial', 'Artículos de Limpieza', 15.00, 'Lts', 5.00, 'Disponible'),
 (21, 'Papel Higiénico Institucional', 'Artículos de Limpieza', 120.00, 'PCE', 24.00, 'Disponible'),
 (22, 'Servilletas de Mesa', 'Artículos de Limpieza', 20.00, 'PCE', 15.00, 'Disponible');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `salidas_insumos`
+--
+
+CREATE TABLE `salidas_insumos` (
+  `id_salida` int(11) NOT NULL,
+  `id_producto` int(11) NOT NULL,
+  `cantidad_salida` decimal(10,2) NOT NULL,
+  `ubicacion_destino` varchar(150) NOT NULL,
+  `fecha_salida` datetime NOT NULL,
+  `id_usuario` int(11) NOT NULL,
+  `observaciones` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+
+--
+-- Volcado de datos para la tabla `salidas_insumos`
+--
+
+INSERT INTO `salidas_insumos` (`id_salida`, `id_producto`, `cantidad_salida`, `ubicacion_destino`, `fecha_salida`, `id_usuario`, `observaciones`) VALUES
+(1, 3, 10.00, 'RIG-42', '2026-10-14 15:30:00', 1, '');
 
 -- --------------------------------------------------------
 
@@ -124,17 +147,10 @@ CREATE TABLE `servicios_catering` (
   `menu_desayuno` text DEFAULT NULL,
   `menu_almuerzo` text DEFAULT NULL,
   `menu_cena` text DEFAULT NULL,
-  `menu_medianoche` text DEFAULT NULL
+  `menu_medianoche` text DEFAULT NULL,
+  `tarifa_alimentacion` decimal(10,2) DEFAULT 0.00,
+  `tarifa_alojamiento` decimal(10,2) DEFAULT 0.00
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
-
---
--- Volcado de datos para la tabla `servicios_catering`
---
-
-INSERT INTO `servicios_catering` (`id_servicio`, `fecha`, `ubicacion_embarcacion`, `desayunos_cliente`, `almuerzos_cliente`, `cenas_cliente`, `cena_medianoche_cliente`, `alojamiento_cliente`, `desayunos_servicio`, `almuerzos_servicio`, `cenas_servicio`, `cena_medianoche_servicio`, `alojamiento_servicio`, `desayunos_maritime`, `almuerzos_maritime`, `cenas_maritime`, `cena_medianoche_maritime`, `alojamiento_maritime`, `observaciones`, `usuario_registro`, `estado`, `fecha_cierre`, `creado_en`, `total_comensales`, `menu_desayuno`, `menu_almuerzo`, `menu_cena`, `menu_medianoche`) VALUES
-(1, '2026-10-08', 'Gabarra ari', 1, 1, 1, 0, 1, 0, 0, 8, 24, 32, 10, 15, 16, 7, 48, '', 'Ariadna Colmenares', 'Abierto', NULL, '2026-10-08 17:42:03', 0, NULL, NULL, NULL, NULL),
-(3, '2026-10-13', 'M-123', 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 'Se agotó el pan de sandwich y esta muy solicitado entre los comensales', 'Angeles Villalobos', 'Abierto', NULL, '2026-10-13 18:52:32', 0, 'Arepas con jamón y queso, Cachitos de pollo, Maicena caliente, Jugo de Mora y Cambur', 'Arroz con pollo, Bistec en salsa, Arroz blanco, Vegetales salteados, Yuca cocida, Sopa de pollo y Jugo de fresa', 'Pollo guisado, Arroz blanco, Pernil en salsa, Platano horneado, Torta de vainilla y Refresco', 'Perros calientes y Refresco'),
-(4, '2026-10-12', 'M-456', 3, 0, 0, 0, 0, 0, 1, 1, 2, 1, 0, 0, 0, 0, 0, '', 'Ariadna Colmenares', 'Abierto', NULL, '2026-10-13 19:10:18', 0, '', '', '', '');
 
 -- --------------------------------------------------------
 
@@ -193,6 +209,13 @@ ALTER TABLE `inventario`
   ADD PRIMARY KEY (`id_producto`);
 
 --
+-- Indices de la tabla `salidas_insumos`
+--
+ALTER TABLE `salidas_insumos`
+  ADD PRIMARY KEY (`id_salida`),
+  ADD KEY `id_producto` (`id_producto`);
+
+--
 -- Indices de la tabla `servicios_catering`
 --
 ALTER TABLE `servicios_catering`
@@ -229,10 +252,16 @@ ALTER TABLE `inventario`
   MODIFY `id_producto` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
+-- AUTO_INCREMENT de la tabla `salidas_insumos`
+--
+ALTER TABLE `salidas_insumos`
+  MODIFY `id_salida` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT de la tabla `servicios_catering`
 --
 ALTER TABLE `servicios_catering`
-  MODIFY `id_servicio` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_servicio` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT de la tabla `solicitudes_catering`
@@ -245,6 +274,16 @@ ALTER TABLE `solicitudes_catering`
 --
 ALTER TABLE `usuarios`
   MODIFY `id_usuario` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- Restricciones para tablas volcadas
+--
+
+--
+-- Filtros para la tabla `salidas_insumos`
+--
+ALTER TABLE `salidas_insumos`
+  ADD CONSTRAINT `salidas_insumos_ibfk_1` FOREIGN KEY (`id_producto`) REFERENCES `inventario` (`id_producto`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

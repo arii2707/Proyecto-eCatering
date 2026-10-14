@@ -106,9 +106,9 @@ $hoy = date('Y-m-d');
 
     <div class="container my-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2><i class="bi bi-card-checklist me-2"></i>Control de Certificados de Salud</h2>
+            <h2><i class="bi bi-card-checklist me-2"></i>Control de certificados de salud</h2>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoCertificado">
-                <i class="bi bi-plus-lg me-1"></i> Nuevo Certificado
+                <i class="bi bi-plus-lg me-1"></i> Nuevo certificado
             </button>
         </div>
 

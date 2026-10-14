@@ -34,7 +34,14 @@ if (isset($_GET['id']) && !empty($_GET['id'])) {
     $tot_cmn = $data['cena_medianoche_cliente'] + $data['cena_medianoche_servicio'] + $data['cena_medianoche_maritime'];
     $tot_alj = $data['alojamiento_cliente'] + $data['alojamiento_servicio'] + $data['alojamiento_maritime'];
 
-    $gran_total = $tot_cli + $tot_ser + $tot_mar;
+    $gran_total_raciones = $tot_des + $tot_alm + $tot_cen + $tot_cmn;
+
+    // Tarifas y Costos
+    $tarifa_alim = floatval($data['tarifa_alimentacion'] ?? 0);
+    $tarifa_aloj = floatval($data['tarifa_alojamiento'] ?? 0);
+    $costo_alimentacion = $gran_total_raciones * $tarifa_alim;
+    $costo_alojamiento = $tot_alj * $tarifa_aloj;
+    $costo_total_dia = $costo_alimentacion + $costo_alojamiento;
     ?>
 
     <!DOCTYPE html>
@@ -72,8 +79,8 @@ if (isset($_GET['id']) && !empty($_GET['id'])) {
         </div>
 
         <div class="header">
-            <h2>Reporte Diario de Servicio de Catering</h2>
-            <p>SISTEMA DE GESTIÓN eCATERING - REGISTRO DE COMIDAS SERVIDAS Y ALOJAMIENTO</p>
+            <h2>Reporte Diario de Servicio de Catering y Costos</h2>
+            <p>SISTEMA DE GESTIÓN eCATERING - REGISTRO DE COMIDAS, ALOJAMIENTO Y TARIFAS</p>
         </div>
 
         <table class="info-box">
@@ -87,6 +94,13 @@ if (isset($_GET['id']) && !empty($_GET['id'])) {
                 <td class="info-title">UBICACIÓN:</td>
                 <td colspan="3"><?php echo htmlspecialchars($data['ubicacion_embarcacion']); ?></td>
             </tr>
+            <tr>
+                <td class="info-title">TARIFAS:</td>
+                <td colspan="3">
+                    Alimentación (Plato): <strong>$<?php echo number_format($tarifa_alim, 2, ',', '.'); ?></strong> | 
+                    Alojamiento (Cupo): <strong>$<?php echo number_format($tarifa_aloj, 2, ',', '.'); ?></strong>
+                </td>
+            </tr>
         </table>
 
         <h3>Cuadro Resumen de Comidas y Alojamiento por Grupos</h3>
@@ -94,13 +108,13 @@ if (isset($_GET['id']) && !empty($_GET['id'])) {
         <table class="table-data">
             <thead>
                 <tr>
-                    <th style="width: 30%;">GRUPO / PERSONAL</th>
+                    <th style="width: 25%;">GRUPO / PERSONAL</th>
                     <th>DESAYUNOS</th>
                     <th>ALMUERZOS</th>
                     <th>CENAS</th>
                     <th>CENA M. NOCHE</th>
-                    <th>TOTAL ALOJAMIENTO</th>
-                    <th>TOTAL COMIDAS</th>
+                    <th>ALOJAMIENTO</th>
+                    <th>TOTAL RACIONES</th>
                 </tr>
             </thead>
             <tbody>
@@ -139,10 +153,58 @@ if (isset($_GET['id']) && !empty($_GET['id'])) {
                     <td><?php echo $tot_alm; ?></td>
                     <td><?php echo $tot_cen; ?></td>
                     <td><?php echo $tot_cmn; ?></td>
-                    <td style="background-color: #d1e7dd; color: #0f5132; font-size: 14px;"><?php echo $tot_alj; ?></td>
-                    <td style="background-color: #d1e7dd; color: #0f5132; font-size: 14px;"><?php echo $gran_total; ?></td>
+                    <td style="background-color: #d1e7dd; color: #0f5132;"><?php echo $tot_alj; ?></td>
+                    <td style="background-color: #d1e7dd; color: #0f5132;"><?php echo $gran_total_raciones; ?></td>
                 </tr>
             </tfoot>
+        </table>
+
+        <!-- Resumen Financiero -->
+        <table class="info-box" style="margin-top: 20px;">
+            <tr style="background-color: #f8f9fa;">
+                <td colspan="4" style="font-weight: bold; text-align: center; font-size: 14px; color: #0d6efd;">RESUMEN FINANCIERO DEL DÍA</td>
+            </tr>
+            <tr>
+                <td class="info-title">Total Alimentación:</td>
+                <td><?php echo $gran_total_raciones; ?> raciones × $<?php echo number_format($tarifa_alim, 2, ',', '.'); ?> = <strong>$<?php echo number_format($costo_alimentacion, 2, ',', '.'); ?></strong></td>
+                <td class="info-title">Total Alojamiento:</td>
+                <td><?php echo $tot_alj; ?> cupos × $<?php echo number_format($tarifa_aloj, 2, ',', '.'); ?> = <strong>$<?php echo number_format($costo_alojamiento, 2, ',', '.'); ?></strong></td>
+            </tr>
+            <tr>
+                <td class="info-title" style="background-color: #d1e7dd; color: #0f5132;">COSTO TOTAL DÍA:</td>
+                <td colspan="3" style="background-color: #d1e7dd; color: #0f5132; font-size: 15px; font-weight: bold;">
+                    $<?php echo number_format($costo_total_dia, 2, ',', '.'); ?>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Menús Aplicados -->
+        <h3 style="margin-top: 20px;">Menús Aplicados</h3>
+        <table class="table-data" style="text-align: left;">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Turno</th>
+                    <th>Detalle del Menú Registrado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="font-weight: bold;">Desayuno</td>
+                    <td><?php echo !empty($data['menu_desayuno']) ? htmlspecialchars($data['menu_desayuno']) : '<em style="color: #777;">Sin registrar</em>'; ?></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Almuerzo</td>
+                    <td><?php echo !empty($data['menu_almuerzo']) ? htmlspecialchars($data['menu_almuerzo']) : '<em style="color: #777;">Sin registrar</em>'; ?></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Cena</td>
+                    <td><?php echo !empty($data['menu_cena']) ? htmlspecialchars($data['menu_cena']) : '<em style="color: #777;">Sin registrar</em>'; ?></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Media Noche</td>
+                    <td><?php echo !empty($data['menu_medianoche']) ? htmlspecialchars($data['menu_medianoche']) : '<em style="color: #777;">Sin registrar</em>'; ?></td>
+                </tr>
+            </tbody>
         </table>
 
         <?php if (!empty($data['observaciones'])): ?>
@@ -198,7 +260,7 @@ if (!empty($buscar)) {
     $donde .= " AND ubicacion_embarcacion LIKE '%$buscar_clean%'";
 }
 
-// Registros diarios
+// Registros diarios con cálculo de costos por fila
 $sql = "SELECT *, 
         (desayunos_cliente + almuerzos_cliente + cenas_cliente + cena_medianoche_cliente + 
          desayunos_servicio + almuerzos_servicio + cenas_servicio + cena_medianoche_servicio + 
@@ -210,12 +272,8 @@ $sql = "SELECT *,
 
 $resultado = $conexion->query($sql);
 
-// Totales sumados
+// Totales acumulados generales
 $sql_totales = "SELECT 
-        SUM(desayunos_cliente + desayunos_servicio + desayunos_maritime) AS sum_desayunos,
-        SUM(almuerzos_cliente + almuerzos_servicio + almuerzos_maritime) AS sum_almuerzos,
-        SUM(cenas_cliente + cenas_servicio + cenas_maritime) AS sum_cenas,
-        SUM(cena_medianoche_cliente + cena_medianoche_servicio + cena_medianoche_maritime) AS sum_cenas_med,
         SUM(desayunos_cliente + almuerzos_cliente + cenas_cliente + cena_medianoche_cliente + 
             desayunos_servicio + almuerzos_servicio + cenas_servicio + cena_medianoche_servicio + 
             desayunos_maritime + almuerzos_maritime + cenas_maritime + cena_medianoche_maritime) AS gran_total_raciones,
@@ -226,6 +284,24 @@ $sql_totales = "SELECT
 
 $res_totales = $conexion->query($sql_totales);
 $totales = $res_totales ? $res_totales->fetch_assoc() : [];
+
+// Calcular costo total acumulado del período iterando los resultados
+$costo_total_periodo = 0;
+$registros_data = [];
+if ($resultado && $resultado->num_rows > 0) {
+    while ($row = $resultado->fetch_assoc()) {
+        $raciones_dia = intval($row['total_raciones']);
+        $aloj_dia = intval($row['total_alojamiento']);
+        $t_alim = floatval($row['tarifa_alimentacion'] ?? 0);
+        $t_aloj = floatval($row['tarifa_alojamiento'] ?? 0);
+        
+        $subtotal_dia = ($raciones_dia * $t_alim) + ($aloj_dia * $t_aloj);
+        $row['costo_dia'] = $subtotal_dia;
+        $costo_total_periodo += $subtotal_dia;
+        
+        $registros_data[] = $row;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -262,8 +338,8 @@ $totales = $res_totales ? $res_totales->fetch_assoc() : [];
     </div>
 
     <div class="header">
-        <h2>Reporte Consolidado de Servicios de Catering</h2>
-        <p>SISTEMA DE GESTIÓN eCATERING - ACUMULADO DE COMIDAS SERVIDAS Y ALOJAMIENTO POR PERÍODO</p>
+        <h2>Reporte Consolidado y Financiero de Catering</h2>
+        <p>SISTEMA DE GESTIÓN eCATERING - ACUMULADO DE COMIDAS, ALOJAMIENTO Y COSTOS POR PERÍODO</p>
     </div>
 
     <table class="info-box">
@@ -281,60 +357,49 @@ $totales = $res_totales ? $res_totales->fetch_assoc() : [];
             <td class="info-title">DÍAS REGISTRADOS:</td>
             <td><strong><?php echo number_format($totales['total_dias'] ?? 0); ?> día(s)</strong></td>
         </tr>
-        <?php if (!empty($buscar)): ?>
         <tr>
-            <td class="info-title">FILTRO EMBARCACIÓN:</td>
-            <td colspan="3"><strong><?php echo htmlspecialchars($buscar); ?></strong></td>
+            <td class="info-title" style="background-color: #d1e7dd; color: #0f5132;">COSTO TOTAL PERÍODO:</td>
+            <td colspan="3" style="background-color: #d1e7dd; color: #0f5132; font-weight: bold; font-size: 14px;">
+                $<?php echo number_format($costo_total_periodo, 2, ',', '.'); ?>
+            </td>
         </tr>
-        <?php endif; ?>
     </table>
 
-    <h3>Detalle Diario y Totales Acumulados</h3>
+    <h3>Detalle Diario, Raciones y Costos Acumulados</h3>
 
     <table class="table-data">
         <thead>
             <tr>
                 <th>FECHA</th>
                 <th>EMBARCACIÓN / UBICACIÓN</th>
-                <th>DESAYUNOS</th>
-                <th>ALMUERZOS</th>
-                <th>CENAS / CMN</th>
-                <th>ALOJAMIENTO</th>
-                <th>TOTAL COMIDAS</th>
+                <th>RACIONES</th>
+                <th>ALOJ.</th>
+                <th>COSTO TOTAL ($)</th>
             </tr>
         </thead>
         <tbody>
-            <?php if ($resultado && $resultado->num_rows > 0): ?>
-                <?php while ($row = $resultado->fetch_assoc()): ?>
-                    <?php 
-                        $des = $row['desayunos_cliente'] + $row['desayunos_servicio'] + $row['desayunos_maritime'];
-                        $alm = $row['almuerzos_cliente'] + $row['almuerzos_servicio'] + $row['almuerzos_maritime'];
-                        $cen = $row['cenas_cliente'] + $row['cenas_servicio'] + $row['cenas_maritime'] + $row['cena_medianoche_cliente'] + $row['cena_medianoche_servicio'] + $row['cena_medianoche_maritime'];
-                    ?>
+            <?php if (!empty($registros_data)): ?>
+                <?php foreach ($registros_data as $row): ?>
                     <tr>
                         <td><?php echo date('d/m/Y', strtotime($row['fecha'])); ?></td>
                         <td style="text-align: left; padding-left: 10px;"><?php echo htmlspecialchars($row['ubicacion_embarcacion']); ?></td>
-                        <td><?php echo $des; ?></td>
-                        <td><?php echo $alm; ?></td>
-                        <td><?php echo $cen; ?></td>
+                        <td><?php echo $row['total_raciones']; ?></td>
                         <td><?php echo $row['total_alojamiento']; ?></td>
-                        <td><strong><?php echo $row['total_raciones']; ?></strong></td>
+                        <td><strong>$<?php echo number_format($row['costo_dia'], 2, ',', '.'); ?></strong></td>
                     </tr>
-                <?php endwhile; ?>
+                <?php endforeach; ?>
             <?php else: ?>
                 <tr>
-                    <td colspan="7" style="padding: 15px; color: #777;">No se encontraron registros en el período seleccionado.</td>
+                    <td colspan="5" style="padding: 15px; color: #777;">No se encontraron registros en el período seleccionado.</td>
                 </tr>
             <?php endif; ?>
         </tbody>
         <tfoot>
             <tr class="total-row">
                 <td colspan="2" style="text-align: right; padding-right: 15px;">TOTALES ACUMULADOS EN EL RANGO:</td>
-                <td><?php echo number_format($totales['sum_desayunos'] ?? 0); ?></td>
-                <td><?php echo number_format($totales['sum_almuerzos'] ?? 0); ?></td>
-                <td><?php echo number_format(($totales['sum_cenas'] ?? 0) + ($totales['sum_cenas_med'] ?? 0)); ?></td>
-                <td style="background-color: #d1e7dd; color: #0f5132; font-size: 14px;"><?php echo number_format($totales['gran_total_alojamiento'] ?? 0); ?></td>
-                <td style="background-color: #d1e7dd; color: #0f5132; font-size: 14px;"><?php echo number_format($totales['gran_total_raciones'] ?? 0); ?></td>
+                <td><?php echo number_format($totales['gran_total_raciones'] ?? 0); ?></td>
+                <td style="background-color: #d1e7dd; color: #0f5132;"><?php echo number_format($totales['gran_total_alojamiento'] ?? 0); ?></td>
+                <td style="background-color: #d1e7dd; color: #0f5132; font-size: 14px;">$<?php echo number_format($costo_total_periodo, 2, ',', '.'); ?></td>
             </tr>
         </tfoot>
     </table>

@@ -15,6 +15,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['guardar_servicio'])) {
     $fecha =$_POST['fecha'];
     $ubicacion =$conexion->real_escape_string($_POST['ubicacion_embarcacion']);$observaciones = $conexion->real_escape_string($_POST['observaciones']);
 
+    // Tarifas unitarias del día
+    $tarifa_alim = floatval($_POST['tarifa_alimentacion']);
+    $tarifa_aloj = floatval($_POST['tarifa_alojamiento']);
+
     // Cliente
     $d_cli = intval($_POST['desayunos_cliente']);
     $a_cli = intval($_POST['almuerzos_cliente']);
@@ -42,19 +46,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['guardar_servicio'])) {
     $m_medianoche =$conexion->real_escape_string($_POST['menu_medianoche']);$usuario_actual = $conexion->real_escape_string($_SESSION['nombre']);
 
     $sql = "INSERT INTO servicios_catering 
-            (fecha, ubicacion_embarcacion, 
+            (fecha, ubicacion_embarcacion, tarifa_alimentacion, tarifa_alojamiento,
              desayunos_cliente, almuerzos_cliente, cenas_cliente, cena_medianoche_cliente, alojamiento_cliente,
              desayunos_servicio, almuerzos_servicio, cenas_servicio, cena_medianoche_servicio, alojamiento_servicio,
              desayunos_maritime, almuerzos_maritime, cenas_maritime, cena_medianoche_maritime, alojamiento_maritime,
              menu_desayuno, menu_almuerzo, menu_cena, menu_medianoche,
              observaciones, usuario_registro)
             VALUES 
-            ('$fecha', '$ubicacion',$d_cli, $a_cli,$c_cli, $mn_cli,$al_cli,
+            ('$fecha', '$ubicacion',$tarifa_alim, $tarifa_aloj,$d_cli, $a_cli,$c_cli, $mn_cli,$al_cli,
              $d_ser,$a_ser, $c_ser,$mn_ser, $al_ser,$d_mar, $a_mar,$c_mar, $mn_mar,$al_mar,
              '$m_desayuno', '$m_almuerzo', '$m_cena', '$m_medianoche',
              '$observaciones', '$usuario_actual')";
 
-    if ($conexion->query($sql)) {$mensaje = "¡Servicio y menús registrados exitosamente!";
+    if ($conexion->query($sql)) {$mensaje = "¡Servicio, tarifas y menús registrados exitosamente!";
     } else {
         $error = "Error al registrar el servicio: " . $conexion->error;
     }
@@ -114,18 +118,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['guardar_servicio'])) {
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
                     <h5 class="card-title fw-bold mb-0 text-primary">
-                        <i class="bi bi-calendar-event me-2"></i>Datos Operativos del Día
+                        <i class="bi bi-calendar-event me-2"></i>Datos Operativos y Tarifas del Día
                     </h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label class="form-label fw-bold">Fecha del Servicio</label>
                             <input type="date" name="fecha" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
                         </div>
-                        <div class="col-md-8 mb-3">
+                        <div class="col-md-5 mb-3">
                             <label class="form-label fw-bold">Ubicación / Embarcación</label>
                             <input type="text" name="ubicacion_embarcacion" class="form-control" placeholder="Ej. Gabarra M-501 / Lago de Maracaibo" required>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label fw-bold text-success">Tarifa Alimentación</label>
+                            <input type="number" step="0.01" min="0" name="tarifa_alimentacion" class="form-control" value="0$" required>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label fw-bold text-success">Tarifa Alojamiento</label>
+                            <input type="number" step="0.01" min="0" name="tarifa_alojamiento" class="form-control" value="0$" required>
                         </div>
                     </div>
                 </div>
@@ -149,7 +161,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['guardar_servicio'])) {
                                     <th>Cenas</th>
                                     <th>Cena M. Noche</th>
                                     <th>Alojamiento</th>
-                                    <th class="table-secondary">Total</th>
+                                    <th class="table-secondary">Total Raciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -211,19 +223,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['guardar_servicio'])) {
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark"><i class="bi bi-brightness-high me-1"></i> Menú Desayuno</label>
-                            <textarea name="menu_desayuno" class="form-control" rows="2" placeholder="Ej: Opción 1: Arepas con perico / Opción 2: Empanadas..."></textarea>
+                            <textarea name="menu_desayuno" class="form-control" rows="2" placeholder="Ej: Opción 1: Arepas con perico..."></textarea>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-warning text-dark"><i class="bi bi-sun me-1"></i> Menú Almuerzo</label>
-                            <textarea name="menu_almuerzo" class="form-control" rows="2" placeholder="Ej: Sopa de res, Seco: Pollo frito con arroz y tajadas..."></textarea>
+                            <label class="form-label fw-bold text-dark"><i class="bi bi-sun me-1"></i> Menú Almuerzo</label>
+                            <textarea name="menu_almuerzo" class="form-control" rows="2" placeholder="Ej: Sopa de res, Pollo frito..."></textarea>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-info text-dark"><i class="bi bi-moon-stars me-1"></i> Menú Cena</label>
-                            <textarea name="menu_cena" class="form-control" rows="2" placeholder="Ej: Carne desmechada con puré de papas..."></textarea>
+                            <label class="form-label fw-bold text-dark"><i class="bi bi-moon-stars me-1"></i> Menú Cena</label>
+                            <textarea name="menu_cena" class="form-control" rows="2" placeholder="Ej: Carne desmechada..."></textarea>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark"><i class="bi bi-clock-history me-1"></i> Menú Media Noche</label>
-                            <textarea name="menu_medianoche" class="form-control" rows="2" placeholder="Ej: Arepitas asadas con queso blanco y café..."></textarea>
+                            <textarea name="menu_medianoche" class="form-control" rows="2" placeholder="Ej: Arepitas asadas..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -234,16 +246,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['guardar_servicio'])) {
                 <div class="card-body">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Observaciones</label>
-                        <textarea name="observaciones" class="form-control" rows="3" placeholder="Ingresa detalles sobre demoras, visitas adicionales, insumos requeridos..."></textarea>
+                        <textarea name="observaciones" class="form-control" rows="3" placeholder="Ingresa detalles sobre demoras, visitas adicionales..."></textarea>
                     </div>
                     <div class="d-flex justify-content-end">
                         <button type="submit" name="guardar_servicio" class="btn btn-primary px-4 fw-bold">
-                            <i class="bi bi-check-circle-fill me-1"></i> Guardar Registro
+                            <i class="bi bi-check-circle-fill me-1"></i> Guardar Registro con Tarifas
                         </button>
                     </div>
                 </div>
             </div>
-            <input type="hidden" name="cerrar_dia" id="cerrar_flag" value="0">
         </form>
     </div>
 
@@ -257,7 +268,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['guardar_servicio'])) {
                 return total;
             };
 
-            // Totales por fila
             let totCli = sumRow('.cli-r');
             let totSer = sumRow('.ser-r');
             let totMar = sumRow('.mar-r');
@@ -266,7 +276,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['guardar_servicio'])) {
             document.getElementById('total_servicio').innerText = totSer;
             document.getElementById('total_maritime').innerText = totMar;
 
-            // Totales por columna
             let sumCol = (name) => {
                 let inputs = document.querySelectorAll(`input[name*="${name}"]`);
                 let total = 0;
@@ -286,7 +295,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['guardar_servicio'])) {
             document.getElementById('tot_medianoche').innerText = mn;
             document.getElementById('tot_alojamiento').innerText = al;
 
-            // Gran total de raciones
             document.getElementById('gran_total').innerText = d + a + c + mn;
         }
     </script>

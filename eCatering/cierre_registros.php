@@ -24,6 +24,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['actualizar_servicio'])
         $ubicacion     = $conexion->real_escape_string($_POST['ubicacion_embarcacion']);
         $observaciones = $conexion->real_escape_string($_POST['observaciones']);
 
+        // Tarifas unitarias del día
+        $tarifa_alim   = floatval($_POST['tarifa_alimentacion']);
+        $tarifa_aloj   = floatval($_POST['tarifa_alojamiento']);
+
         // Cliente
         $d_cli  = intval($_POST['desayunos_cliente']);
         $a_cli  = intval($_POST['almuerzos_cliente']);
@@ -54,6 +58,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['actualizar_servicio'])
         $sql_update = "UPDATE servicios_catering SET 
                         fecha = '$fecha',
                         ubicacion_embarcacion = '$ubicacion',
+                        tarifa_alimentacion = $tarifa_alim,
+                        tarifa_alojamiento = $tarifa_aloj,
                         desayunos_cliente = $d_cli, almuerzos_cliente = $a_cli, cenas_cliente = $c_cli, cena_medianoche_cliente = $mn_cli, alojamiento_cliente = $al_cli,
                         desayunos_servicio = $d_ser, almuerzos_servicio = $a_ser, cenas_servicio = $c_ser, cena_medianoche_servicio = $mn_ser, alojamiento_servicio = $al_ser,
                         desayunos_maritime = $d_mar, almuerzos_maritime = $a_mar, cenas_maritime = $c_mar, cena_medianoche_maritime = $mn_mar, alojamiento_maritime = $al_mar,
@@ -62,7 +68,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['actualizar_servicio'])
                        WHERE id_servicio = $id_servicio";
 
         if ($conexion->query($sql_update)) {
-            $mensaje = "¡Registro actualizado correctamente!";
+            $mensaje = "¡Registro y tarifas actualizados correctamente!";
         } else {
             $error = "Error al actualizar el registro: " . $conexion->error;
         }
@@ -146,7 +152,7 @@ $resultado = $conexion->query($sql);
             </div>
         <?php endif; ?>
 
-        <!-- Filtros de Búsqueda y Botón de PDF Consolidado -->
+        <!-- Filtros de Búsqueda -->
         <div class="card border-0 shadow-sm mb-4 no-print">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h5 class="card-title fw-bold mb-0 text-primary">
@@ -177,34 +183,40 @@ $resultado = $conexion->query($sql);
 
         <!-- Listado de Registros -->
         <h4 class="fw-bold mb-3 text-secondary">
-            <i class="bi bi-journal-check me-2"></i>Historial de Servicios (<?php echo date('d/m/Y', strtotime($fecha_inicio)); ?> al <?php echo date('d/m/Y', strtotime($fecha_fin)); ?>)
+            <i class="bi bi-journal-check me-2"></i>Historial de Servicios y Costos (<?php echo date('d/m/Y', strtotime($fecha_inicio)); ?> al <?php echo date('d/m/Y', strtotime($fecha_fin)); ?>)
         </h4>
 
         <?php if ($resultado && $resultado->num_rows > 0): ?>
             <?php while ($row = $resultado->fetch_assoc()): 
-                // Totales por turno
+                // Totales por turno y grupo
                 $tot_desayunos = $row['desayunos_cliente'] + $row['desayunos_servicio'] + $row['desayunos_maritime'];
                 $tot_almuerzos = $row['almuerzos_cliente'] + $row['almuerzos_servicio'] + $row['almuerzos_maritime'];
                 $tot_cenas     = $row['cenas_cliente'] + $row['cenas_servicio'] + $row['cenas_maritime'];
                 $tot_mn        = $row['cena_medianoche_cliente'] + $row['cena_medianoche_servicio'] + $row['cena_medianoche_maritime'];
                 $tot_aloj      = $row['alojamiento_cliente'] + $row['alojamiento_servicio'] + $row['alojamiento_maritime'];
-                $gran_total    = $tot_desayunos + $tot_almuerzos + $tot_cenas + $tot_mn;
+                $gran_total_raciones = $tot_desayunos + $tot_almuerzos + $tot_cenas + $tot_mn;
+
+                // Tarifas del registro
+                $tarifa_alim = floatval($row['tarifa_alimentacion'] ?? 0);
+                $tarifa_aloj = floatval($row['tarifa_alojamiento'] ?? 0);
+
+                // Cálculos financieros
+                $costo_alimentacion = $gran_total_raciones * $tarifa_alim;
+                $costo_alojamiento = $tot_aloj * $tarifa_aloj;
+                $costo_total_dia = $costo_alimentacion + $costo_alojamiento;
             ?>
                 <div class="card border-0 shadow-sm mb-4">
                     <!-- Cabecera de la Tarjeta Diaria -->
-                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="d-flex align-items-center gap-2">
                             <span class="badge bg-primary px-3 py-2 fs-6">
                                 <i class="bi bi-calendar-event me-1"></i> <?php echo date('d/m/Y', strtotime($row['fecha'])); ?>
                             </span>
                             <strong class="text-dark"><i class="bi bi-geo-alt-fill text-danger me-1"></i> <?php echo htmlspecialchars($row['ubicacion_embarcacion']); ?></strong>
                         </div>
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
                             <span class="badge bg-success px-3 py-2 fs-6">
-                                <i class="bi bi-pie-chart-fill me-1"></i> Total Raciones: <?php echo $gran_total; ?>
-                            </span>
-                            <span class="badge bg-info text-dark px-3 py-2 fs-6">
-                                <i class="bi bi-house-door-fill me-1"></i> Alojamiento: <?php echo $tot_aloj; ?>
+                                <i class="bi bi-cash-stack me-1"></i> Total Día: $<?php echo number_format($costo_total_dia, 2, ',', '.'); ?>
                             </span>
                             
                             <!-- Botón Editar -->
@@ -221,7 +233,17 @@ $resultado = $conexion->query($sql);
                     </div>
 
                     <div class="card-body">
-                        <!-- 1. Resumen Numérico por Grupos -->
+                        <!-- Información de Tarifas Aplicadas -->
+                        <div class="row mb-3 bg-light p-2 rounded border small">
+                            <div class="col-md-6">
+                                <span class="text-muted">Tarifa Alimentación (Plato):</span> <strong>$<?php echo number_format($tarifa_alim, 2, ',', '.'); ?></strong> (Total: $<?php echo number_format($costo_alimentacion, 2, ',', '.'); ?>)
+                            </div>
+                            <div class="col-md-6">
+                                <span class="text-muted">Tarifa Alojamiento (Cupo):</span> <strong>$<?php echo number_format($tarifa_aloj, 2, ',', '.'); ?></strong> (Total: $<?php echo number_format($costo_alojamiento, 2, ',', '.'); ?>)
+                            </div>
+                        </div>
+
+                        <!-- Detalle de Comensales por Grupo -->
                         <h6 class="fw-bold text-dark mb-2"><i class="bi bi-table me-1"></i> Detalle de Comensales por Grupo</h6>
                         <div class="table-responsive mb-3">
                             <table class="table table-bordered table-sm text-center align-middle table-mini mb-0">
@@ -233,7 +255,7 @@ $resultado = $conexion->query($sql);
                                         <th>Cenas</th>
                                         <th>Cena M. Noche</th>
                                         <th class="table-secondary">Alojamiento</th>
-                                        <th class="table-secondary">Total</th>
+                                        <th class="table-secondary">Total Raciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -273,13 +295,13 @@ $resultado = $conexion->query($sql);
                                         <td><?php echo $tot_cenas; ?></td>
                                         <td><?php echo $tot_mn; ?></td>
                                         <td><?php echo $tot_aloj; ?></td>
-                                        <td class="table-primary text-dark"><?php echo $gran_total; ?></td>
+                                        <td class="table-primary text-dark"><?php echo $gran_total_raciones; ?></td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
 
-                        <!-- 2. Tabla de Menús Aplicados del Día -->
+                        <!-- Menús Aplicados -->
                         <h6 class="fw-bold text-dark mb-2"><i class="bi bi-journal-text me-1"></i> Menús Aplicados</h6>
                         <div class="table-responsive mb-3">
                             <table class="table table-bordered table-sm align-middle table-mini mb-0">
@@ -310,7 +332,6 @@ $resultado = $conexion->query($sql);
                             </table>
                         </div>
 
-                        <!-- Observaciones y Usuario -->
                         <?php if (!empty($row['observaciones'])): ?>
                             <div class="bg-light p-2 rounded mb-2 border">
                                 <small class="fw-bold text-secondary d-block"><i class="bi bi-chat-left-text me-1"></i> Observaciones:</small>
@@ -343,7 +364,7 @@ $resultado = $conexion->query($sql);
                     <input type="hidden" name="id_servicio" id="edit_id">
                     
                     <div class="modal-header bg-warning text-dark">
-                        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Editar Registro Diario de Servicio</h5>
+                        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Editar Registro Diario de Servicio y Tarifas</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     
@@ -353,10 +374,19 @@ $resultado = $conexion->query($sql);
                                 <label class="form-label fw-bold">Fecha</label>
                                 <input type="date" name="fecha" id="edit_fecha" class="form-control" required>
                             </div>
-                            <div class="col-md-8">
-                                <label class="form-label fw-bold">Ubicación / Embarcación</label>
-                                <input type="text" name="ubicacion_embarcacion" id="edit_ubicacion" class="form-control" required>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-success">Tarifa Alimentación</label>
+                                <input type="number" step="0.01" name="tarifa_alimentacion" id="edit_tarifa_alim" class="form-control" required>
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-success">Tarifa Alojamiento</label>
+                                <input type="number" step="0.01" name="tarifa_alojamiento" id="edit_tarifa_aloj" class="form-control" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Ubicación / Embarcación</label>
+                            <input type="text" name="ubicacion_embarcacion" id="edit_ubicacion" class="form-control" required>
                         </div>
 
                         <!-- Conteo por Grupos -->
@@ -468,6 +498,8 @@ $resultado = $conexion->query($sql);
             document.getElementById('edit_id').value = data.id_servicio;
             document.getElementById('edit_fecha').value = data.fecha;
             document.getElementById('edit_ubicacion').value = data.ubicacion_embarcacion;
+            document.getElementById('edit_tarifa_alim').value = data.tarifa_alimentacion || 0;
+            document.getElementById('edit_tarifa_aloj').value = data.tarifa_alojamiento || 0;
 
             // Cliente
             document.getElementById('edit_d_cli').value = data.desayunos_cliente;
@@ -499,7 +531,6 @@ $resultado = $conexion->query($sql);
             // Observaciones
             document.getElementById('edit_observaciones').value = data.observaciones || '';
 
-            // Mostrar el modal de edición
             var modal = new bootstrap.Modal(document.getElementById('modalEditar'));
             modal.show();
         }
