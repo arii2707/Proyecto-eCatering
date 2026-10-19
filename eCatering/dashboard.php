@@ -8,14 +8,14 @@ if (!isset($_SESSION['id_usuario'])) {
 
 require_once "config/conexion.php";
 
-// 1. Alertas de Certificados de Salud (vencidos o por vencer en 30 días)
+// 1. Alertas de Certificados de Salud
 $sql_badge = "SELECT COUNT(*) AS total_alertas
               FROM certificados_salud
               WHERE fecha_vencimiento <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)";
 $res_badge = $conexion->query($sql_badge);
 $total_alertas = $res_badge ? intval($res_badge->fetch_assoc()['total_alertas']) : 0;
 
-// 2. Estadísticas rápidas de Servicios de Catering (Raciones de hoy)
+// 2. Estadísticas rápidas de Servicios de Catering
 $sql_catering = "SELECT
     COUNT(*) AS total_servicios,
     SUM(CASE WHEN fecha = CURDATE() THEN (desayunos_cliente + almuerzos_cliente + cenas_cliente + cena_medianoche_cliente + desayunos_servicio + almuerzos_servicio + cenas_servicio + cena_medianoche_servicio + desayunos_maritime + almuerzos_maritime + cenas_maritime + cena_medianoche_maritime) ELSE 0 END) AS raciones_hoy
@@ -46,7 +46,12 @@ if ($res_shoy) {
     $comensales_hoy = intval($row_sh['total_hoy'] ?? 0);
 }
 
-// 5. Consultar el consumo y costos de los últimos 7 días para la gráfica
+// 5. Consultar solicitudes pendientes
+$sql_solicitudes_pend = "SELECT COUNT(*) AS pendientes FROM solicitudes_catering WHERE estado_solicitud = 'Pendiente'";
+$res_sol_pend = $conexion->query($sql_solicitudes_pend);
+$solicitudes_pendientes = $res_sol_pend ? intval($res_sol_pend->fetch_assoc()['pendientes']) : 0;
+
+// 6. Consultar el consumo y costos de los últimos 7 días para la gráfica
 $sql_grafica = "SELECT fecha, 
     SUM(desayunos_cliente + almuerzos_cliente + cenas_cliente + cena_medianoche_cliente + 
         desayunos_servicio + almuerzos_servicio + cenas_servicio + cena_medianoche_servicio + 
@@ -68,13 +73,11 @@ if ($res_grafica && $res_grafica->num_rows > 0) {
     while ($row_g = $res_grafica->fetch_assoc()) {
         $temp_data[] = $row_g;
     }
-    // Invertir el orden para que vaya del más antiguo al más reciente en la gráfica
     $temp_data = array_reverse($temp_data);
     foreach ($temp_data as $d) {
         $fechas_arr[] = date('d/m', strtotime($d['fecha']));
         $raciones_arr[] = intval($d['total_dia']);
         
-        // Cálculo del costo total diario
         $t_alim = floatval($d['tarifa_alimentacion'] ?? 0);
         $t_aloj = floatval($d['tarifa_alojamiento'] ?? 0);
         $subtotal = (intval($d['total_dia']) * $t_alim) + (intval($d['total_aloj_dia']) * $t_aloj);
@@ -95,144 +98,197 @@ if ($res_grafica && $res_grafica->num_rows > 0) {
 </head>
 <body class="bg-light">
 
-    <!-- Navegación -->
+    <!-- Navegación Superior -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary px-4 shadow-sm">
         <a class="navbar-brand fw-bold" href="dashboard.php">eCatering System</a>
         <div class="ms-auto d-flex align-items-center text-white">
             <span class="me-3">Bienvenido, <strong><?php echo $_SESSION['nombre']; ?></strong> (<?php echo $_SESSION['rol']; ?>)</span>
             
-            <a href="certificados.php" class="btn btn-outline-light btn-sm me-3 position-relative">
-                <i class="bi bi-card-checklist me-1"></i> Certificados
-                <?php if ($total_alertas > 0): ?>
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                        <?php echo $total_alertas; ?>
-                        <span class="visually-hidden">alertas</span>
-                    </span>
-                <?php endif; ?>
-            </a>
+            <!-- Botón de Usuarios en el Nav -->
+            <?php 
+            $roles_admin = ['Coord.(a) catering', 'Superv.(a) catering', 'Administrador'];
+            if (isset($_SESSION['rol']) && in_array($_SESSION['rol'], $roles_admin)): 
+            ?>
+                <a href="usuarios.php" class="btn btn-outline-light btn-sm me-3">
+                    <i class="bi bi-people-fill me-1"></i> Usuarios
+                </a>
+            <?php endif; ?>
 
             <a href="logout.php" class="btn btn-outline-light btn-sm">Cerrar Sesión</a>
         </div>
     </nav>
 
     <div class="container my-5">
+        <!-- Alerta de acceso denegado -->
+        <?php if (isset($_GET['error']) && $_GET['error'] === 'acceso_denegado'): ?>
+            <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert">
+                <i class="bi bi-shield-lock-fill me-2"></i> <strong>Acceso Denegado:</strong> No posees los permisos requeridos para acceder a la Gestión de Usuarios.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
         <h3 class="mb-4 text-secondary">Bienvenido al sistema de gestión eCatering</h3>
         
-       <!-- Fila de Tarjetas del Dashboard -->
-       <div class="row g-4 justify-content-center align-items-stretch">
-        <!-- Tarjeta 1: Gestión de Inventario -->
-         <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100 text-center p-4">
-                <div class="card-body d-flex flex-column p-0">
-                    <div class="mb-3">
-                        <h5 class="fw-bold text-dark mb-1">
-                            <i class="bi bi-box-seam text-primary me-2"></i>Gestión de Inventario
-                        </h5>
-                        <p class="text-muted small mb-0">Control de insumos y víveres para embarcaciones.</p>
-                    </div>
-                    
-                    <div class="my-auto py-2">
-                        <?php if ($cant_criticos > 0): ?>
-                            <span class="badge bg-warning text-dark px-3 py-2 fw-semibold">
-                                <i class="bi bi-exclamation-triangle-fill me-1"></i> <?php echo $cant_criticos; ?> reponer / crítico
-                            </span>
-                        <?php else: ?>
-                            <span class="badge bg-success px-3 py-2 fw-semibold">
-                                <i class="bi bi-check-circle-fill me-1"></i> Stock óptimo
-                            </span>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <div class="mt-auto pt-3">
-                        <a href="inventario.php" class="btn btn-primary px-4 w-50">Entrar</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Tarjeta 2: Certificados de Salud -->
-         <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100 text-center p-4">
-                <div class="card-body d-flex flex-column p-0">
-                    <div class="mb-3">
-                        <h5 class="fw-bold text-dark mb-1">
-                            <i class="bi bi-card-checklist text-primary me-2"></i>Certificados de Salud
-                        </h5>
-                        <p class="text-muted small mb-0">Control de fechas y estatus por cuadrillas del personal.</p>
-                    </div>
-                    
-                    <div class="my-auto py-2">
-                        <?php if ($total_alertas > 0): ?>
-                            <span class="badge bg-danger px-3 py-2 fw-semibold">
-                                <i class="bi bi-exclamation-octagon-fill me-1"></i> <?php echo $total_alertas; ?> por vencer / vencidos
-                            </span>
-                        <?php else: ?>
-                            <span class="badge bg-success px-3 py-2 fw-semibold">
-                                <i class="bi bi-check-circle-fill me-1"></i> Todos vigentes
-                            </span>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <div class="mt-auto pt-3">
-                        <a href="certificados.php" class="btn btn-primary px-4 w-50">Entrar</a>
+        <!-- Grid de Módulos Principales -->
+        <div class="row g-4 justify-content-center">
+            
+            <!-- Tarjeta 1: Gestión de Inventario -->
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 text-center p-3">
+                    <div class="card-body d-flex flex-column p-0">
+                        <div class="mb-3">
+                            <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex p-3 mb-2">
+                                <i class="bi bi-box-seam fs-2"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-1">Gestión de Inventario</h5>
+                            <p class="text-muted small mb-0">Control de insumos y víveres para embarcaciones.</p>
+                        </div>
+                        
+                        <div class="my-auto py-2">
+                            <?php if ($cant_criticos > 0): ?>
+                                <span class="badge bg-warning text-dark px-3 py-2 fw-semibold">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i> <?php echo $cant_criticos; ?> reponer / crítico
+                                </span>
+                            <?php else: ?>
+                                <span class="badge bg-success px-3 py-2 fw-semibold">
+                                    <i class="bi bi-check-circle-fill me-1"></i> Stock óptimo
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="mt-auto pt-3">
+                            <a href="inventario.php" class="btn btn-primary fw-bold w-100 shadow-sm">
+                                Entrar <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Tarjeta 3: Servicios de Catering -->
-         <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100 text-center p-4">
-                <div class="card-body d-flex flex-column p-0">
-                    <div class="mb-3">
-                        <h5 class="fw-bold text-dark mb-1">
-                            <i class="bi bi-check2-square text-primary me-2"></i>Servicios de Catering
-                        </h5>
-                        <p class="text-muted small mb-0">Registro diario de servicios y cierres.</p>
-                    </div>
-                    
-                    <div class="my-auto py-2">
-                        <span class="badge bg-info text-dark px-3 py-2 fw-semibold">
-                            <i class="bi bi-egg-fried me-1"></i> <?php echo $comensales_hoy; ?> comidas servidas hoy
-                        </span>
-                    </div>
-                    
-                    <div class="mt-auto pt-3">
-                        <a href="servicio_diario.php" class="btn btn-primary px-4 w-50">Entrar</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Sección de Gráfica de Tendencia (Estilo Líneas Suaves / Área) -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm p-4">
-                <h5 class="fw-bold text-dark mb-3">
-                    <i class="bi bi-graph-up-arrow text-primary me-2"></i>Tendencia de platos servidos y costos ($)
-                </h5>
-                <div style="position: relative; height: 320px; width: 100%;">
-                    <canvas id="graficaRaciones"></canvas>
+            <!-- Tarjeta 2: Certificados de Salud -->
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 text-center p-3">
+                    <div class="card-body d-flex flex-column p-0">
+                        <div class="mb-3">
+                            <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex p-3 mb-2">
+                                <i class="bi bi-card-checklist fs-2"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-1">Certificados de Salud</h5>
+                            <p class="text-muted small mb-0">Control de fechas y estatus por cuadrillas del personal.</p>
+                        </div>
+                        
+                        <div class="my-auto py-2">
+                            <?php if ($total_alertas > 0): ?>
+                                <span class="badge bg-danger px-3 py-2 fw-semibold">
+                                    <i class="bi bi-exclamation-octagon-fill me-1"></i> <?php echo $total_alertas; ?> por vencer / vencidos
+                                </span>
+                            <?php else: ?>
+                                <span class="badge bg-success px-3 py-2 fw-semibold">
+                                    <i class="bi bi-check-circle-fill me-1"></i> Todos vigentes
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="mt-auto pt-3">
+                            <a href="certificados.php" class="btn btn-primary fw-bold w-100 shadow-sm">
+                                Entrar <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta 3: Servicios de Catering -->
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 text-center p-3">
+                    <div class="card-body d-flex flex-column p-0">
+                        <div class="mb-3">
+                            <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex p-3 mb-2">
+                                <i class="bi bi-check2-square fs-2"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-1">Servicios de Catering</h5>
+                            <p class="text-muted small mb-0">Registro diario de comidas servidas y cierres.</p>
+                        </div>
+                        
+                        <div class="my-auto py-2">
+                            <span class="badge bg-success px-3 py-2 fw-semibold">
+                                <i class="bi bi-egg-fried me-1"></i> <?php echo $comensales_hoy; ?> comidas servidas hoy
+                            </span>
+                        </div>
+                        
+                        <div class="mt-auto pt-3">
+                            <a href="servicio_diario.php" class="btn btn-primary fw-bold w-100 shadow-sm">
+                                Entrar <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta 4: Gestión de Pedidos -->
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 text-center p-3">
+                    <div class="card-body d-flex flex-column p-0">
+                        <div class="mb-3">
+                            <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex p-3 mb-2">
+                                <i class="bi bi-clipboard-check fs-2"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-1">Gestión Pedidos</h5>
+                            <p class="text-muted small mb-0">Gestión y despachos de víveres para embarcaciones.</p>
+                        </div>
+                        
+                        <div class="my-auto py-2">
+                            <?php if ($solicitudes_pendientes > 0): ?>
+                                <span class="badge bg-warning text-dark px-3 py-2 fw-semibold">
+                                    <i class="bi bi-clock-history me-1"></i> <?php echo $solicitudes_pendientes; ?> pendientes
+                                </span>
+                            <?php else: ?>
+                                <span class="badge bg-success px-3 py-2 fw-semibold">
+                                    <i class="bi bi-check2-all me-1"></i> Solicitudes al día
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="mt-auto pt-3">
+                            <a href="solicitudes.php" class="btn btn-primary fw-bold w-100 shadow-sm">
+                                Entrar <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- Cierre del Grid row -->
+
+        <!-- Sección de Gráfica de Tendencia -->
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm p-4">
+                    <h5 class="fw-bold text-dark mb-3">
+                        <i class="bi bi-graph-up-arrow text-primary me-2"></i>Tendencia de platos servidos y costos ($)
+                    </h5>
+                    <div style="position: relative; height: 320px; width: 100%;">
+                        <canvas id="graficaRaciones"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
+
     </div>
-</div>
 
 <script>
     const ctx = document.getElementById('graficaRaciones').getContext('2d');
     const graficaRaciones = new Chart(ctx, {
-        type: 'line', // Cambiado a líneas generales
+        type: 'line',
         data: {
             labels: <?php echo json_encode($fechas_arr); ?>,
             datasets: [{
                 label: 'Total de Raciones Servidas',
                 data: <?php echo json_encode($raciones_arr); ?>,
-                borderColor: '#0d6efd', // Azul principal elegante
-                backgroundColor: 'rgba(13, 110, 253, 0.1)', // Sombreado translúcido debajo de la línea
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
                 borderWidth: 3,
-                tension: 0.4, // Curvatura suave y fluida
+                tension: 0.4,
                 fill: true,
                 pointBackgroundColor: '#0d6efd',
                 pointRadius: 4,
@@ -240,8 +296,8 @@ if ($res_grafica && $res_grafica->num_rows > 0) {
             }, {
                 label: 'Costo Total Diario ($)',
                 data: <?php echo json_encode($costos_arr); ?>,
-                borderColor: '#198754', // Verde corporativo para finanzas
-                backgroundColor: 'rgba(25, 135, 84, 0.1)', // Sombreado translúcido
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.1)',
                 borderWidth: 3,
                 tension: 0.4,
                 fill: true,
@@ -254,49 +310,30 @@ if ($res_grafica && $res_grafica->num_rows > 0) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: {
-                    grid: {
-                        display: false // Cuadrícula vertical limpia
-                    }
-                },
+                x: { grid: { display: false } },
                 y: {
                     type: 'linear',
                     display: true,
                     position: 'left',
                     beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Raciones'
-                    },
-                    grid: {
-                        color: '#f1f1f1'
-                    },
-                    ticks: {
-                        precision: 0
-                    }
+                    title: { display: true, text: 'Raciones' },
+                    grid: { color: '#f1f1f1' },
+                    ticks: { precision: 0 }
                 },
                 y1: {
                     type: 'linear',
                     display: true,
                     position: 'right',
                     beginAtZero: true,
-                    grid: {
-                        drawOnChartArea: false // Evita interferencia de líneas entre ejes
-                    },
-                    title: {
-                        display: true,
-                        text: 'Costo ($)'
-                    }
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'Costo ($)' }
                 }
             },
             plugins: {
                 legend: {
                     display: true,
                     position: 'top',
-                    labels: {
-                        usePointStyle: true,
-                        boxWidth: 8
-                    }
+                    labels: { usePointStyle: true, boxWidth: 8 }
                 }
             }
         }

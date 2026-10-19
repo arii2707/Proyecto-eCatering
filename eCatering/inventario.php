@@ -25,6 +25,7 @@ $seccion = $_GET['sec'] ?? 'maestro';
 $res_inv = null;
 $lista_productos = null;
 $historial_salidas = null;
+$historial_entradas = null;
 
 // ACTUALIZACIÓN GLOBAL DE ESTATUS AL CARGAR
 $res_estatus = $conexion->query("SELECT id_producto, cantidad, stock_minimo FROM inventario");
@@ -89,7 +90,7 @@ if (isset($_GET['eliminar'])) {
     }
 }
 
-// 4. Registrar Salida de Insumos
+// 4. Registrar Salida de Insumos (PEPS)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'registrar_salida') {
     $id_producto       = intval($_POST['id_producto']);
     $cantidad_salida   = floatval($_POST['cantidad_salida']);
@@ -140,7 +141,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['
     }
 }
 
-// 5. Importar Inventario desde CSV
+// 5. Registrar Entrada / Reabastecimiento de Insumos
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'registrar_entrada') {
+    $id_producto       = intval($_POST['id_producto']);
+    $cantidad_entrada  = floatval($_POST['cantidad_entrada']);
+    $proveedor         = $conexion->real_escape_string($_POST['proveedor']);
+    $num_factura_orden = $conexion->real_escape_string($_POST['num_factura_orden']);
+    $fecha_vencimiento = !empty($_POST['fecha_vencimiento']) ? "'" . $conexion->real_escape_string($_POST['fecha_vencimiento']) . "'" : "NULL";
+    $observaciones     = $conexion->real_escape_string($_POST['observaciones']);
+    $id_usuario        = $_SESSION['id_usuario'];
+
+    if ($cantidad_entrada <= 0) {
+        $error_entrada = "La cantidad ingresada debe ser mayor a cero.";
+    } else {
+        $conexion->begin_transaction();
+        try {
+            $sql_stk = "SELECT cantidad, stock_minimo FROM inventario WHERE id_producto = $id_producto FOR UPDATE";
+            $res_stk = $conexion->query($sql_stk);
+
+            if ($res_stk && $res_stk->num_rows > 0) {
+                $prod_data = $res_stk->fetch_assoc();
+                $stock_actual = floatval($prod_data['cantidad']);
+
+                $nueva_cantidad = $stock_actual + $cantidad_entrada;
+                $nuevo_estado   = calcularEstado($nueva_cantidad, floatval($prod_data['stock_minimo']));
+
+                // Insertar en historial de entradas
+                $sql_ins_entrada = "INSERT INTO entradas_insumos (id_producto, cantidad, proveedor, num_factura_orden, fecha_vencimiento, fecha_entrada, id_usuario, observaciones) 
+                                    VALUES ($id_producto, $cantidad_entrada, '$proveedor', '$num_factura_orden', $fecha_vencimiento, NOW(), $id_usuario, '$observaciones')";
+                if (!$conexion->query($sql_ins_entrada)) {
+                    throw new Exception("Error al registrar el reabastecimiento: " . $conexion->error);
+                }
+
+                // Actualizar stock y estado en inventario
+                $sql_upd_inv = "UPDATE inventario SET cantidad = $nueva_cantidad, estado = '$nuevo_estado' WHERE id_producto = $id_producto";
+                if (!$conexion->query($sql_upd_inv)) {
+                    throw new Exception("Error al actualizar el stock maestro: " . $conexion->error);
+                }
+
+                $conexion->commit();
+                header("Location: inventario.php?sec=entradas&mensaje=entrada_exito");
+                exit();
+            } else {
+                throw new Exception("El producto seleccionado no existe.");
+            }
+        } catch (Exception $e) {
+            $conexion->rollback();
+            $error_entrada = $e->getMessage();
+        }
+    }
+}
+
+// 6. Importar Inventario desde CSV
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'importar_csv') {
     if (isset($_FILES['archivo_csv']) && $_FILES['archivo_csv']['error'] === UPLOAD_ERR_OK) {
         $archivo = $_FILES['archivo_csv']['tmp_name'];
@@ -201,6 +253,13 @@ if ($seccion == 'maestro') {
                                           INNER JOIN inventario i ON s.id_producto = i.id_producto 
                                           INNER JOIN usuarios u ON s.id_usuario = u.id_usuario 
                                           ORDER BY s.fecha_salida DESC LIMIT 15");
+} elseif ($seccion == 'entradas') {
+    $lista_productos = $conexion->query("SELECT id_producto, nombre_insumo, cantidad, unidad_medida FROM inventario ORDER BY nombre_insumo ASC");
+    $historial_entradas = $conexion->query("SELECT e.*, i.nombre_insumo, i.unidad_medida, u.nombre AS usuario_nombre 
+                                           FROM entradas_insumos e 
+                                           INNER JOIN inventario i ON e.id_producto = i.id_producto 
+                                           INNER JOIN usuarios u ON e.id_usuario = u.id_usuario 
+                                           ORDER BY e.fecha_entrada DESC LIMIT 15");
 }
 ?>
 
@@ -252,8 +311,13 @@ if ($seccion == 'maestro') {
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?php echo ($seccion == 'entradas') ? 'active fw-bold' : ''; ?>" href="inventario.php?sec=entradas">
+                    <i class="bi bi-arrow-down-left-circle-fill me-1 text-success"></i> Entrada de Insumos
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?php echo ($seccion == 'salidas') ? 'active fw-bold' : ''; ?>" href="inventario.php?sec=salidas">
-                    <i class="bi bi-arrow-up-right-circle-fill me-1"></i> Salida de Insumos
+                    <i class="bi bi-arrow-up-right-circle-fill me-1 text-danger"></i> Salida de Insumos
                 </a>
             </li>
         </ul>
@@ -285,12 +349,24 @@ if ($seccion == 'maestro') {
                     <i class="bi bi-check-circle-fill me-2"></i> ¡Salida de insumo registrada con éxito y stock actualizado!
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
+            <?php elseif ($_GET['mensaje'] === 'entrada_exito'): ?>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle-fill me-2"></i> ¡Entrada de insumo registrada correctamente y stock reabastecido!
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
             <?php endif; ?>
         <?php endif; ?>
 
         <?php if (isset($error_salida)): ?>
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="bi bi-exclamation-octagon-fill me-2"></i> <?php echo $error_salida; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
+        <?php if (isset($error_entrada)): ?>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-octagon-fill me-2"></i> <?php echo $error_entrada; ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         <?php endif; ?>
@@ -437,6 +513,118 @@ if ($seccion == 'maestro') {
                 </div>
             </div>
 
+        <?php elseif ($seccion == 'entradas'): ?>
+            <!-- Pestaña Entrada de Insumos (Reabastecimiento) -->
+            <div class="row">
+                <div class="col-lg-4 mb-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3">
+                            <h5 class="fw-bold text-secondary mb-0">
+                                <i class="bi bi-box-arrow-in-down text-success me-2"></i>Registrar Entrada / Reabastecimiento
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="inventario.php?sec=entradas">
+                                <input type="hidden" name="accion" value="registrar_entrada">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Seleccionar Insumo</label>
+                                    <select name="id_producto" class="form-select" required>
+                                        <option value="">-- Elija del inventario --</option>
+                                        <?php if ($lista_productos && $lista_productos->num_rows > 0): ?>
+                                            <?php while ($prod = $lista_productos->fetch_assoc()): ?>
+                                                <option value="<?php echo $prod['id_producto']; ?>">
+                                                    <?php echo htmlspecialchars($prod['nombre_insumo']); ?> (Stock Actual: <?php echo $prod['cantidad'] . ' ' . $prod['unidad_medida']; ?>)
+                                                </option>
+                                            <?php endwhile; ?>
+                                        <?php endif; ?>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Cantidad Recibida</label>
+                                    <input type="number" step="0.01" name="cantidad_entrada" class="form-control" placeholder="Ej. 50.00" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Proveedor / Contratista</label>
+                                    <input type="text" name="proveedor" class="form-control" placeholder="Ej. Distribuidora Maritime C.A." required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">N° Factura / Orden de Compra</label>
+                                    <input type="text" name="num_factura_orden" class="form-control" placeholder="Ej. FACT-2026-089">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Fecha de Vencimiento (PEPS)</label>
+                                    <input type="date" name="fecha_vencimiento" class="form-control">
+                                    <span class="text-muted small">* Requerido para priorización de salidas PEPS.</span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Observaciones / Estado del Lote</label>
+                                    <textarea name="observaciones" class="form-control" rows="2" placeholder="Ej. Empaque sellado correctamente, temperatura óptima"></textarea>
+                                </div>
+
+                                <button type="submit" class="btn btn-success w-100 fw-bold py-2">
+                                    <i class="bi bi-plus-circle me-1"></i> Registrar Entrada y Sumar Stock
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                            <h5 class="fw-bold text-secondary mb-0">
+                                <i class="bi bi-clock-history text-secondary me-2"></i>Historial Reciente de Reabastecimientos
+                            </h5>
+                            <a href="reporte_entradas.php" class="btn btn-outline-success btn-sm fw-bold shadow-sm">
+                                <i class="bi bi-file-earmark-excel me-1"></i> Descargar Reporte
+                            </a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0 text-center small">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Fecha / Hora</th>
+                                            <th class="text-start">Insumo</th>
+                                            <th>Cantidad</th>
+                                            <th>Proveedor</th>
+                                            <th>Factura / N° Orden</th>
+                                            <th>Vencimiento</th>
+                                            <th>Observaciones</th>
+                                            <th>Registrado por</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if ($historial_entradas && $historial_entradas->num_rows > 0): ?>
+                                            <?php while ($row = $historial_entradas->fetch_assoc()): ?>
+                                                <tr>
+                                                    <td><?php echo date('d/m/Y H:i', strtotime($row['fecha_entrada'])); ?></td>
+                                                    <td class="text-start fw-bold text-success"><?php echo htmlspecialchars($row['nombre_insumo']); ?></td>
+                                                    <td><span class="badge bg-success-subtle text-success border px-2 py-1 fw-bold">+<?php echo $row['cantidad'] . ' ' . $row['unidad_medida']; ?></span></td>
+                                                    <td><?php echo htmlspecialchars($row['proveedor']); ?></td>
+                                                    <td><?php echo !empty($row['num_factura_orden']) ? htmlspecialchars($row['num_factura_orden']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                                    <td><?php echo !empty($row['fecha_vencimiento']) ? date('d/m/Y', strtotime($row['fecha_vencimiento'])) : '<span class="text-muted">Sin Fecha</span>'; ?></td>
+                                                    <td class="text-start"><small class="text-muted"><?php echo !empty($row['observaciones']) ? htmlspecialchars($row['observaciones']) : '-'; ?></small></td>
+                                                    <td class="text-muted"><?php echo htmlspecialchars($row['usuario_nombre']); ?></td>
+                                                </tr>
+                                            <?php endwhile; ?>
+                                        <?php else: ?>
+                                            <tr><td colspan="8" class="py-4 text-muted">No hay registros de entradas recientes.</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         <?php elseif ($seccion == 'salidas'): ?>
             <!-- Pestaña Salida de Insumos -->
             <div class="row">
@@ -471,8 +659,8 @@ if ($seccion == 'maestro') {
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold small">Embarcación</label>
-                                    <input type="text" name="ubicacion_destino" class="form-control" placeholder="Ej. RIG-" required>
+                                    <label class="form-label fw-bold small">Embarcación / Destino</label>
+                                    <input type="text" name="ubicacion_destino" class="form-control" placeholder="Ej. RIG-123 / Gabarra" required>
                                 </div>
 
                                 <div class="mb-3">
@@ -490,10 +678,14 @@ if ($seccion == 'maestro') {
 
                 <div class="col-lg-8">
                     <div class="card border-0 shadow-sm">
-                        <div class="card-header bg-white py-3">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                             <h5 class="fw-bold text-secondary mb-0">
                                 <i class="bi bi-clock-history text-secondary me-2"></i>Historial Reciente de Salidas
                             </h5>
+                            <!-- Botón Descargar Reporte de Salidas -->
+                            <a href="reporte_salidas.php" class="btn btn-outline-danger btn-sm fw-bold shadow-sm" title="Exportar historial de salidas a Excel">
+                                <i class="bi bi-file-earmark-excel me-1"></i> Descargar Reporte
+                            </a>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
@@ -504,6 +696,7 @@ if ($seccion == 'maestro') {
                                             <th class="text-start">Insumo</th>
                                             <th>Cantidad</th>
                                             <th class="text-start">Embarcación</th>
+                                            <th>Observaciones</th>
                                             <th>Autorizado por</th>
                                         </tr>
                                     </thead>
@@ -515,6 +708,7 @@ if ($seccion == 'maestro') {
                                                     <td class="text-start fw-bold text-primary"><?php echo htmlspecialchars($row['nombre_insumo']); ?></td>
                                                     <td><span class="badge bg-danger-subtle text-danger border px-2 py-1 fw-bold">-<?php echo $row['cantidad_salida'] . ' ' . $row['unidad_medida']; ?></span></td>
                                                     <td class="text-start"><?php echo htmlspecialchars($row['ubicacion_destino']); ?></td>
+                                                    <td class="text-start"><small class="text-muted"><?php echo !empty($row['observaciones']) ? htmlspecialchars($row['observaciones']) : '-'; ?></small></td>
                                                     <td class="text-muted"><?php echo htmlspecialchars($row['usuario_nombre']); ?></td>
                                                 </tr>
                                             <?php endwhile; ?>
@@ -548,24 +742,24 @@ if ($seccion == 'maestro') {
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-bold">Nombre del Insumo / Descripción:</label>
-                            <input type="text" name="nombre_insumo" class="form-control" placeholder="Ej: Aceite de Oliva" required>
+                            <input type="text" name="nombre_insumo" class="form-control" placeholder="Ej: Arroz Tipo I (1kg)" required>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Unidad Medida:</label>
-                            <input type="text" name="unidad_medida" class="form-control" placeholder="Ej: Kg, Lts, PCE" required>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Cantidad Inicial:</label>
+                            <input type="number" step="0.01" name="cantidad_inicial" class="form-control" placeholder="0.00" required>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Cant. Inicial:</label>
-                            <input type="number" step="0.01" name="cantidad_inicial" class="form-control" value="0.00" required>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Unidad de Medida:</label>
+                            <input type="text" name="unidad_medida" class="form-control" placeholder="Ej: Kg, Sacos, Litros" required>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Stock Mínimo:</label>
-                            <input type="number" step="0.01" name="stock_minimo" class="form-control" value="5.00" required>
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">Stock Mínimo Alerta:</label>
+                            <input type="number" step="0.01" name="stock_minimo" class="form-control" placeholder="Ej: 10.00" required>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Guardar Insumo</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Guardar Insumo</button>
                     </div>
                 </form>
             </div>
@@ -580,7 +774,7 @@ if ($seccion == 'maestro') {
                     <input type="hidden" name="accion" value="editar_insumo">
                     <input type="hidden" name="id_producto" id="edit_id_producto">
                     <div class="modal-header bg-warning text-dark">
-                        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Editar Insumo</h5>
+                        <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Insumo</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body row g-3">
@@ -589,25 +783,25 @@ if ($seccion == 'maestro') {
                             <input type="text" name="categoria" id="edit_categoria" class="form-control" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">Nombre del Insumo / Descripción:</label>
-                            <input type="text" name="nombre_insumo" id="edit_nombre_insumo" class="form-control" required>
+                            <label class="form-label fw-bold">Nombre del Insumo:</label>
+                            <input type="text" name="nombre_insumo" id="edit_nombre" class="form-control" required>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Unidad Medida:</label>
-                            <input type="text" name="unidad_medida" id="edit_unidad_medida" class="form-control" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Cantidad Actual:</label>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Existencia Actual:</label>
                             <input type="number" step="0.01" name="cantidad" id="edit_cantidad" class="form-control" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Unidad de Medida:</label>
+                            <input type="text" name="unidad_medida" id="edit_unidad" class="form-control" required>
+                        </div>
+                        <div class="col-md-12">
                             <label class="form-label fw-bold">Stock Mínimo:</label>
-                            <input type="number" step="0.01" name="stock_minimo" id="edit_stock_minimo" class="form-control" required>
+                            <input type="number" step="0.01" name="stock_minimo" id="edit_stock" class="form-control" required>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-warning text-dark fw-bold"><i class="bi bi-arrow-repeat me-1"></i> Actualizar</button>
+                        <button type="submit" class="btn btn-warning fw-bold">Actualizar Insumo</button>
                     </div>
                 </form>
             </div>
@@ -621,40 +815,46 @@ if ($seccion == 'maestro') {
                 <form method="POST" action="" enctype="multipart/form-data">
                     <input type="hidden" name="accion" value="importar_csv">
                     <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title"><i class="bi bi-file-earmark-excel me-2"></i>Importar Inventario</h5>
+                        <h5 class="modal-title"><i class="bi bi-file-earmark-excel me-2"></i>Importar Inventario (.CSV)</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info py-2 small">
-                            <i class="bi bi-info-circle-fill me-1"></i> El archivo CSV debe contener exactamente 5 columnas:<br>
-                            <code>Nombre, Categoría, Cantidad, Unidad, Stock Mínimo</code>.
-                        </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Seleccionar archivo CSV:</label>
                             <input type="file" name="archivo_csv" class="form-control" accept=".csv" required>
                         </div>
+                        <div class="alert alert-light border small text-muted">
+                            <strong>Formato requerido en el CSV:</strong><br>
+                            Columna 1: Nombre Insumo<br>
+                            Columna 2: Categoría<br>
+                            Columna 3: Cantidad Inicial<br>
+                            Columna 4: Unidad de Medida<br>
+                            Columna 5: Stock Mínimo
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-success"><i class="bi bi-upload me-1"></i> Cargar Datos</button>
+                        <button type="submit" class="btn btn-success fw-bold">Procesar e Importar</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
+    <!-- Scripts de Bootstrap y Modal Dynamic Handler -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Cargar datos en el modal de edición dinámicamente
         const modalEditar = document.getElementById('modalEditarInsumo');
         if (modalEditar) {
             modalEditar.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
                 document.getElementById('edit_id_producto').value = button.getAttribute('data-id');
-                document.getElementById('edit_nombre_insumo').value = button.getAttribute('data-nombre');
-                document.getElementById('edit_categoria').value = button.getAttribute('data-categoria');
-                document.getElementById('edit_cantidad').value = button.getAttribute('data-cantidad');
-                document.getElementById('edit_unidad_medida').value = button.getAttribute('data-unidad');
-                document.getElementById('edit_stock_minimo').value = button.getAttribute('data-stock');
+                document.getElementById('edit_nombre').value      = button.getAttribute('data-nombre');
+                document.getElementById('edit_categoria').value   = button.getAttribute('data-categoria');
+                document.getElementById('edit_cantidad').value    = button.getAttribute('data-cantidad');
+                document.getElementById('edit_unidad').value      = button.getAttribute('data-unidad');
+                document.getElementById('edit_stock').value       = button.getAttribute('data-stock');
             });
         }
     </script>
