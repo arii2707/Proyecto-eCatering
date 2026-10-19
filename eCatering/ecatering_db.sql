@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 14-10-2026 a las 21:41:41
+-- Tiempo de generación: 19-10-2026 a las 22:11:21
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.2.12
 
@@ -49,6 +49,32 @@ INSERT INTO `certificados_salud` (`id_certificado`, `cedula`, `nombre_personal`,
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `entradas_insumos`
+--
+
+CREATE TABLE `entradas_insumos` (
+  `id_entrada` int(11) NOT NULL,
+  `id_producto` int(11) NOT NULL,
+  `cantidad` decimal(10,2) NOT NULL,
+  `proveedor` varchar(150) DEFAULT NULL,
+  `num_factura_orden` varchar(50) DEFAULT NULL,
+  `fecha_vencimiento` date DEFAULT NULL,
+  `fecha_entrada` datetime DEFAULT current_timestamp(),
+  `id_usuario` int(11) NOT NULL,
+  `observaciones` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `entradas_insumos`
+--
+
+INSERT INTO `entradas_insumos` (`id_entrada`, `id_producto`, `cantidad`, `proveedor`, `num_factura_orden`, `fecha_vencimiento`, `fecha_entrada`, `id_usuario`, `observaciones`) VALUES
+(1, 3, 10.00, 'MVT', '22555', '2026-10-31', '2026-10-19 10:40:39', 1, 'Perfectas condiciones'),
+(2, 3, 5.00, 'MVT', '22555', '2026-10-31', '2026-10-19 10:41:30', 1, 'perfecto');
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `inventario`
 --
 
@@ -69,7 +95,7 @@ CREATE TABLE `inventario` (
 INSERT INTO `inventario` (`id_producto`, `nombre_insumo`, `categoria`, `cantidad`, `unidad_medida`, `stock_minimo`, `estado`) VALUES
 (1, 'Arroz Blanco Superior', 'Víveres', 150.00, 'Kg', 30.00, 'Disponible'),
 (2, 'Harina de Maíz Precocida', 'Víveres', 200.00, 'Kg', 50.00, 'Disponible'),
-(3, 'Aceite Vegetal 1L', 'Víveres', 20.00, 'Lts', 15.00, 'Disponible'),
+(3, 'Aceite Vegetal 1L', 'Víveres', 25.00, 'Lts', 15.00, 'Disponible'),
 (4, 'Azúcar Refinada', 'Víveres', 38.00, 'Kg', 20.00, 'Disponible'),
 (5, 'Pasta Plumas', 'Víveres', 80.00, 'Kg', 20.00, 'Disponible'),
 (6, 'Caraotas Negras', 'Víveres', 45.00, 'Kg', 10.00, 'Disponible'),
@@ -111,7 +137,8 @@ CREATE TABLE `salidas_insumos` (
 --
 
 INSERT INTO `salidas_insumos` (`id_salida`, `id_producto`, `cantidad_salida`, `ubicacion_destino`, `fecha_salida`, `id_usuario`, `observaciones`) VALUES
-(1, 3, 10.00, 'RIG-42', '2026-10-14 15:30:00', 1, '');
+(1, 3, 10.00, 'RIG-42', '2026-10-14 15:30:00', 1, ''),
+(2, 3, 5.00, 'RIG-42', '2026-10-19 11:36:11', 1, 'perfecto');
 
 -- --------------------------------------------------------
 
@@ -168,6 +195,14 @@ CREATE TABLE `solicitudes_catering` (
   `observaciones` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
+--
+-- Volcado de datos para la tabla `solicitudes_catering`
+--
+
+INSERT INTO `solicitudes_catering` (`id_solicitud`, `codigo_solicitud`, `ubicacion_embarcacion`, `fecha_solicitud`, `fecha_entrega`, `estado_solicitud`, `observaciones`) VALUES
+(1, 'PED-20261019-604', 'M-123', '2026-10-19 14:40:35', '2026-10-30', 'Despachado', 'Víveres Secos y Granos | Aceite Vegetal | Cuñete | 18Ltr | 5 | 91.5\r\nVíveres Secos y Granos | Arroz Mary | Unid | 900Grs | 10 | 1.75\r\nProteínas y Carnes | Pollo entero | Kg Directo | 1Kg | 100 | 4.95'),
+(2, 'PED-20261019-250', 'M-123', '2026-10-19 15:00:24', '2026-10-30', 'Despachado', 'PROVEEDOR: FASTO\r\nVíveres Secos y Granos | Aceite Vegetal | Cuñete | 18Ltr | 10 | 91.5\r\nVíveres Secos y Granos | Arroz Mary | Kg Directo | 0.9Kg | 15 | 1.75\r\nVíveres Secos y Granos | Atún en agua | Unid | 0.17Kg | 20 | 4.5\r\nProteínas y Carnes | Carne para mechar | Kg Directo | 1Kg | 50 | 13.3');
+
 -- --------------------------------------------------------
 
 --
@@ -180,16 +215,17 @@ CREATE TABLE `usuarios` (
   `email` varchar(100) NOT NULL,
   `password` varchar(255) NOT NULL,
   `rol` enum('Coord.(a) catering','Superv.(a) catering','Esp. Almacen') DEFAULT 'Coord.(a) catering',
-  `creado_en` timestamp NOT NULL DEFAULT current_timestamp()
+  `creado_en` timestamp NOT NULL DEFAULT current_timestamp(),
+  `estado` varchar(20) DEFAULT 'Activo'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
 -- Volcado de datos para la tabla `usuarios`
 --
 
-INSERT INTO `usuarios` (`id_usuario`, `nombre`, `email`, `password`, `rol`, `creado_en`) VALUES
-(1, 'Ariadna Colmenares', 'pasante@maritime.com', '123456', 'Coord.(a) catering', '2026-10-06 22:09:04'),
-(2, 'Angeles Villalobos', 'Angeles@maritime.com', '456123', 'Esp. Almacen', '2026-10-08 18:14:42');
+INSERT INTO `usuarios` (`id_usuario`, `nombre`, `email`, `password`, `rol`, `creado_en`, `estado`) VALUES
+(1, 'Ariadna Colmenares', 'pasante@maritime.com', '$2y$10$ff9PdSX9OI6jEugn5uKGxOl1YB.8jOO08Roxh0vP3IHgAfePiD2qS', 'Coord.(a) catering', '2026-10-06 22:09:04', 'Activo'),
+(2, 'Angeles Villalobos', 'Angeles@maritime.com', '$2y$10$mF0M5iXsOcqeeNIyTaOr1uFtc.6rFlobhFStZdgsyldqeis6TqEta', 'Esp. Almacen', '2026-10-08 18:14:42', 'Activo');
 
 --
 -- Índices para tablas volcadas
@@ -201,6 +237,14 @@ INSERT INTO `usuarios` (`id_usuario`, `nombre`, `email`, `password`, `rol`, `cre
 ALTER TABLE `certificados_salud`
   ADD PRIMARY KEY (`id_certificado`),
   ADD UNIQUE KEY `cedula` (`cedula`);
+
+--
+-- Indices de la tabla `entradas_insumos`
+--
+ALTER TABLE `entradas_insumos`
+  ADD PRIMARY KEY (`id_entrada`),
+  ADD KEY `id_producto` (`id_producto`),
+  ADD KEY `id_usuario` (`id_usuario`);
 
 --
 -- Indices de la tabla `inventario`
@@ -246,6 +290,12 @@ ALTER TABLE `certificados_salud`
   MODIFY `id_certificado` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT de la tabla `entradas_insumos`
+--
+ALTER TABLE `entradas_insumos`
+  MODIFY `id_entrada` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
 -- AUTO_INCREMENT de la tabla `inventario`
 --
 ALTER TABLE `inventario`
@@ -255,7 +305,7 @@ ALTER TABLE `inventario`
 -- AUTO_INCREMENT de la tabla `salidas_insumos`
 --
 ALTER TABLE `salidas_insumos`
-  MODIFY `id_salida` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id_salida` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT de la tabla `servicios_catering`
@@ -267,17 +317,24 @@ ALTER TABLE `servicios_catering`
 -- AUTO_INCREMENT de la tabla `solicitudes_catering`
 --
 ALTER TABLE `solicitudes_catering`
-  MODIFY `id_solicitud` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_solicitud` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT de la tabla `usuarios`
 --
 ALTER TABLE `usuarios`
-  MODIFY `id_usuario` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id_usuario` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- Restricciones para tablas volcadas
 --
+
+--
+-- Filtros para la tabla `entradas_insumos`
+--
+ALTER TABLE `entradas_insumos`
+  ADD CONSTRAINT `entradas_insumos_ibfk_1` FOREIGN KEY (`id_producto`) REFERENCES `inventario` (`id_producto`) ON DELETE CASCADE,
+  ADD CONSTRAINT `entradas_insumos_ibfk_2` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`);
 
 --
 -- Filtros para la tabla `salidas_insumos`
