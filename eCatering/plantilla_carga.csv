@@ -1,7 +1,0 @@
-﻿codigo_sku,nombre_insumo,tipo_rubro,categoria,cantidad,unidad_medida,stock_minimo,stock_maximo
-,Harina de Trigo Precoz,Comestible,Víveres,150,Kg,20,200
-,Aceite Vegetal 1L,Comestible,Víveres,80,Lts,15,120
-COM-0001,Arroz Blanco Grano Largo,Comestible,Víveres,200,Kg,30,300
-,Detergente Multiuso Industrial,No Comestible,Limpieza,45,Kg,10,60
-,Desengrasante Concentrado,No Comestible,Limpieza,25,Lts,5,40
-,Jabón Líquido para Manos,No Comestible,Higiene,0,Lts,5,30
